@@ -17,6 +17,8 @@ static void *JKSMoviePlayerControllerItemStatusContext = &JKSMoviePlayerControll
 static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLayerReadyForDisplay;
 
 @interface JKSMoviePlayerController ()
+- (void)loadContentForURL:(NSURL*)fileURL;
+
 @property (strong, readwrite) NSView *view;
 @property (retain) id timeObserverToken;
 @property (strong) AVPlayer *player;
@@ -34,13 +36,12 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 - (instancetype)initWithContentURL:(NSURL *)fileURL
 {
     if ((self = [super init])) {
-        _contentURL = [fileURL copy];
         _scalingMode = JKSMoviePlayerScalingResizeAspect;
         _playable = NO;
 
         _view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 640, 480)];
         [_view setWantsLayer:YES];
-        [_view setTranslatesAutoresizingMaskIntoConstraints:NO];
+        [_view setTranslatesAutoresizingMaskIntoConstraints:YES];
         _spinner = [[NSProgressIndicator alloc] initWithFrame:NSZeroRect];
         [_spinner setTranslatesAutoresizingMaskIntoConstraints:NO];
         [_spinner setStyle:NSProgressIndicatorSpinningStyle];
@@ -84,18 +85,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
                   options:NSKeyValueObservingOptionNew
                   context:JKSMoviePlayerControllerItemStatusContext];
 
-        // Create an asset with our URL, asychronously load its tracks, its duration, and whether it's playable or protected.
-        // When that loading is complete, configure a player to play the asset.
-        AVURLAsset *asset = [AVAsset assetWithURL:_contentURL];
-        NSArray *assetKeysToLoadAndTest = @[@"playable", @"hasProtectedContent", @"tracks", @"duration"];
-        [asset loadValuesAsynchronouslyForKeys:assetKeysToLoadAndTest completionHandler:^(void) {
-            // The asset invokes its completion handler on an arbitrary queue when loading is complete.
-            // Because we want to access our AVPlayer in our ensuing set-up, we must dispatch our handler to the main queue.
-            dispatch_async(dispatch_get_main_queue(), ^(void) {
-                [self setUpPlaybackOfAsset:asset withKeys:assetKeysToLoadAndTest];
-            });
-            
-        }];
+        [self loadContentForURL:fileURL];
         
         _controllerView = [[JKSMoviePlayerControllerView alloc] initWithFrame:NSMakeRect(0, 0, 440, 40)];
         [_view addSubview:_controllerView];
@@ -321,6 +311,12 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 	// We can play this asset.
 	// Set up an AVPlayerLayer according to whether the asset contains video.
 	if ([[asset tracksWithMediaType:AVMediaTypeVideo] count] != 0) {
+        // if we already have a playerLayer, remove it
+        if (_playerLayer)
+        {
+            [_playerLayer removeFromSuperlayer];
+            _playerLayer = nil;
+        }
 		// Create an AVPlayerLayer and add it to the player view if there is video, but hide it until it's ready for display
 		_playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
 		_playerLayer.frame = [[_view layer] bounds];
@@ -400,6 +396,23 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
     }
 }
 
+- (void)loadContentForURL:(NSURL*)fileURL
+{
+    
+    // Create an asset with our URL, asychronously load its tracks, its duration, and whether it's playable or protected.
+    // When that loading is complete, configure a player to play the asset.
+    _contentURL = [fileURL copy];
+    AVURLAsset *asset = [AVAsset assetWithURL:_contentURL];
+    NSArray *assetKeysToLoadAndTest = @[@"playable", @"hasProtectedContent", @"tracks", @"duration"];
+    [asset loadValuesAsynchronouslyForKeys:assetKeysToLoadAndTest completionHandler:^(void) {
+        // The asset invokes its completion handler on an arbitrary queue when loading is complete.
+        // Because we want to access our AVPlayer in our ensuing set-up, we must dispatch our handler to the main queue.
+        dispatch_async(dispatch_get_main_queue(), ^(void) {
+            [self setUpPlaybackOfAsset:asset withKeys:assetKeysToLoadAndTest];
+        });
+        
+    }];
+}
 
 - (void)constrainItem:(id)item toCenterOfItem:(id)containerItem
 {
