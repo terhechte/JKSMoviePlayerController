@@ -12,6 +12,28 @@
 #define NSCOLOR(r, g, b, a) [NSColor colorWithCalibratedRed:r/255.0f green:g/255.0f blue:b/255.0f alpha:a]
 #endif
 
+
+@interface NSImage (PreMountainLionAddition)
+@end
+
+@implementation NSImage (PreMountainLionAddition)
++ (id)IG_imageWithSize:(NSSize)size flipped:(BOOL)drawingHandlerShouldBeCalledWithFlippedContext drawingHandler:(BOOL (^)(NSRect dstRect))drawingHandler
+{
+    if ([NSImage respondsToSelector:@selector(imageWithSize:flipped:drawingHandler:)])
+    {
+        return [NSImage imageWithSize:size flipped:drawingHandlerShouldBeCalledWithFlippedContext drawingHandler:drawingHandler];
+    } else {
+        // our custom implementation
+        NSImage *img = [[NSImage alloc] initWithSize:size];
+        [img setFlipped:drawingHandlerShouldBeCalledWithFlippedContext];
+        [img lockFocus];
+        drawingHandler(NSMakeRect(0, 0, size.width, size.height));
+        [img unlockFocus];
+        return img;
+    }
+}
+@end
+
 @interface JKSMoviePlayerSliderCell : NSSliderCell
 @end
 
@@ -167,7 +189,7 @@
 
 - (NSImage *)rewindImageWithSize:(NSSize)size
 {
-    NSImage *image = [NSImage imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
+    NSImage *image = [NSImage IG_imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
         NSBezierPath *path = [[NSBezierPath alloc] init];
         [path moveToPoint:NSMakePoint(NSMinX(dstRect), NSMidY(dstRect))];
         [path lineToPoint:NSMakePoint(NSMidX(dstRect), NSMinY(dstRect))];
@@ -189,7 +211,7 @@
 
 - (NSImage *)playImageWithSize:(NSSize)size
 {
-    return [NSImage imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
+    return [NSImage IG_imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
         NSBezierPath *path = [[NSBezierPath alloc] init];
         [path moveToPoint:NSZeroPoint];
         [path lineToPoint:NSMakePoint(NSMaxX(dstRect), NSMidY(dstRect))];
@@ -204,7 +226,7 @@
 
 - (NSImage *)pauseImageWithSize:(NSSize)size
 {
-    NSImage *image = [NSImage imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
+    NSImage *image = [NSImage IG_imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
         [[NSColor whiteColor] setFill];
         const CGFloat spacing = 2.0f;
         NSRectFill(NSMakeRect(NSMinX(dstRect), NSMinY(dstRect), (NSWidth(dstRect)/2)-spacing, NSHeight(dstRect)));
@@ -218,7 +240,7 @@
 
 - (NSImage *)fastForwardImageWithSize:(NSSize)size
 {
-    NSImage *image = [NSImage imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
+    NSImage *image = [NSImage IG_imageWithSize:size flipped:YES drawingHandler:^BOOL(NSRect dstRect) {
         NSBezierPath *path = [[NSBezierPath alloc] init];
         [path moveToPoint:NSMakePoint(NSMinX(dstRect), NSMinY(dstRect))];
         [path lineToPoint:NSMakePoint(NSMinX(dstRect), NSMaxY(dstRect))];
