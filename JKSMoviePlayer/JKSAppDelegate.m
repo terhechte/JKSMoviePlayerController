@@ -46,14 +46,7 @@
     self.movieController = [[JKSMoviePlayerController alloc] initWithContentURL:url];
     self.movieController.scalingMode = JKSMoviePlayerScalingResizeAspectFill;
     NSView *movieView = self.movieController.view;
+    [movieView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable | NSViewMaxYMargin | NSViewMinYMargin | NSViewMaxXMargin | NSViewMinXMargin];
     [self.movieContainerView addSubview:movieView];
-    [self.movieContainerView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[movieView(>=440)]|"
-                                                                                    options:0
-                                                                                    metrics:nil
-                                                                                      views:NSDictionaryOfVariableBindings(movieView)]];
-    [self.movieContainerView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[movieView(>=60)]|"
-                                                                                    options:0
-                                                                                    metrics:nil
-                                                                                      views:NSDictionaryOfVariableBindings(movieView)]];
 }
 @end
