@@ -59,9 +59,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         [_spinner startAnimation:self];
         [_view addSubview:_spinner];
 
-        CGColorRef color = [[NSColor blackColor] CGColor];
-        [_view layer].backgroundColor = color;
-        CGColorRelease(color);
+        [_view layer].backgroundColor = [[NSColor blackColor] CGColor];
         NSTrackingArea *tracker = [[NSTrackingArea alloc] initWithRect:[_view bounds]
                                                                options:(NSTrackingActiveInKeyWindow |
                                                                         NSTrackingMouseEnteredAndExited |
