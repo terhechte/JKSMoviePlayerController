@@ -43,7 +43,7 @@
 {
     NSRect knobRect = [super knobRectFlipped:flipped];
     knobRect.origin.x += 6;
-    knobRect.origin.y += 7.5;
+    knobRect.origin.y += 10.5; //7.5
     knobRect.size.height = 8;
     knobRect.size.width = 8;
     return knobRect;
@@ -112,12 +112,14 @@
         [_timeLabel setStringValue:@"--:--"];
         [self addSubview:_timeLabel];
         
+        [self updateLayout];
     }
 
     return self;
 }
 
 - (void)resizeSubviewsWithOldSize:(NSSize)oldBoundsSize {
+    [super resizeSubviewsWithOldSize:oldBoundsSize];
     [self updateLayout];
 }
 
@@ -133,7 +135,7 @@
     
     t.size.width = NSWidth(f) - (NSWidth(p) + p.origin.x + 10 + NSWidth(l) + 10);
     t.origin.x = NSWidth(p) + p.origin.x + 10;
-    t.origin.y = NSHeight(f) / 2 - NSHeight(t)/2;
+    t.origin.y = (NSHeight(f) / 2 - NSHeight(t)/2) + 5;
     
     l.origin.x = NSWidth(f) - (NSWidth(l) + 10);
     l.origin.y = NSHeight(f) / 2 - NSHeight(l)/2;
