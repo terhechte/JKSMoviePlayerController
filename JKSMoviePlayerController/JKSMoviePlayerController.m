@@ -31,6 +31,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 @implementation JKSMoviePlayerController
 {
     NSProgressIndicator *_spinner;
+    NSTimer *_downloadStateTimer;
 }
 
 - (instancetype)initWithContentURL:(NSURL *)fileURL
@@ -405,6 +406,47 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         });
         
     }];
+    
+    // start measuring the download state
+    if (_downloadStateTimer) {
+        [_downloadStateTimer invalidate];
+        _downloadStateTimer = nil;
+    }
+    _downloadStateTimer = [NSTimer scheduledTimerWithTimeInterval:0.1
+                                                           target:self
+                                                         selector:@selector(updateDownloadDuration)
+                                                         userInfo:nil
+                                                          repeats:YES];
+}
+
+- (void) updateDownloadDuration {
+    NSTimeInterval currentDuration = [self availableDuration];
+    NSTimeInterval totalDuration = CMTimeGetSeconds(self.player.currentItem.asset.duration);
+    
+    
+    if (isnan(currentDuration) || isnan(totalDuration)) {
+        [self.controllerView setDownloadPercentage:0];
+        return;
+    }
+
+    if (currentDuration >= totalDuration) {
+        [_downloadStateTimer invalidate];
+        _downloadStateTimer = nil;
+    }
+    
+    // update the display
+    [self.controllerView setDownloadPercentage:currentDuration/totalDuration];
+}
+
+// http://stackoverflow.com/questions/7691854/avplayer-streaming-progress
+- (NSTimeInterval) availableDuration;
+{
+    NSArray *loadedTimeRanges = [[self.player currentItem] loadedTimeRanges];
+    CMTimeRange timeRange = [[loadedTimeRanges objectAtIndex:0] CMTimeRangeValue];
+    Float64 startSeconds = CMTimeGetSeconds(timeRange.start);
+    Float64 durationSeconds = CMTimeGetSeconds(timeRange.duration);
+    NSTimeInterval result = startSeconds + durationSeconds;
+    return result;
 }
 
 

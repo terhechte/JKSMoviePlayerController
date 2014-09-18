@@ -35,6 +35,10 @@
 @end
 
 @interface JKSMoviePlayerSliderCell : NSSliderCell
+{
+    CGFloat _downloadPercentage;
+}
+- (void) setDownloadPercentage:(CGFloat)percentage;
 @end
 
 @implementation JKSMoviePlayerSliderCell
@@ -63,18 +67,37 @@
 
 - (void)drawBarInside:(NSRect)aRect flipped:(BOOL)flipped
 {
+    // draw the default background
+    [self drawInsideAreaWithWidth:1.0 rect:aRect color1:NSCOLOR(3, 3, 3, 1) color2:NSCOLOR(23, 23, 23, 1) strokeColor:NSCOLOR(13, 13, 13, 1)];
+    // draw the downloaded area
+    if (_downloadPercentage > 0.1) {
+        [self drawInsideAreaWithWidth:_downloadPercentage rect:aRect color1:[NSColor selectedControlColor]
+                               color2:[NSColor alternateSelectedControlColor]
+                          strokeColor:[NSColor selectedControlColor]];
+    }
+}
+
+- (void) drawInsideAreaWithWidth:(CGFloat)width rect:(NSRect)aRect color1:(NSColor*)color1 color2:(NSColor*)color2 strokeColor:(NSColor*)strokeColor {
+    
     NSRect sliderRect = aRect;
     sliderRect.origin.y += (NSMaxY(sliderRect) / 2) - 4;
     sliderRect.origin.x += 2;
     sliderRect.size.width -= 4;
+    sliderRect.size.width *= width;
     sliderRect.size.height = 11;
-
+    
     NSBezierPath *barPath = [NSBezierPath bezierPathWithRoundedRect:sliderRect xRadius:4 yRadius:4];
-    NSGradient *borderGradient = [[NSGradient alloc] initWithColors:@[NSCOLOR(3, 3, 3, 1), NSCOLOR(23, 23, 23, 1)]];
+    NSGradient *borderGradient = [[NSGradient alloc] initWithColors:@[color1, color2]];
     [borderGradient drawInBezierPath:barPath angle:90];
     NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(sliderRect, 1, 1) xRadius:4 yRadius:4];
-    [NSCOLOR(13, 13, 13, 1) setFill];
+    [strokeColor setFill];
     [innerPath fill];
+}
+
+- (void) setDownloadPercentage:(CGFloat)percentage
+{
+    _downloadPercentage = percentage;
+    [self.controlView setNeedsDisplay:YES];
 }
 
 
@@ -143,6 +166,11 @@
     [_playPauseButton setFrame:p];
     [_timeSlider setFrame:t];
     [_timeLabel setFrame:l];
+}
+
+- (void)setDownloadPercentage:(CGFloat)percentage
+{
+    [(JKSMoviePlayerSliderCell*)_timeSlider.cell setDownloadPercentage:percentage];
 }
 
 

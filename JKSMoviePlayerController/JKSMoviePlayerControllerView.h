@@ -14,4 +14,5 @@
 @property (strong) NSTextField *timeLabel;
 
 - (void)setPlaying:(BOOL)flag;
+- (void)setDownloadPercentage:(CGFloat)percentage;
 @end
