@@ -16,7 +16,9 @@ static void *JKSMoviePlayerControllerRateContext = &JKSMoviePlayerControllerRate
 static void *JKSMoviePlayerControllerItemStatusContext = &JKSMoviePlayerControllerItemStatusContext;
 static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLayerReadyForDisplay;
 
-@interface JKSMoviePlayerController ()
+@interface JKSMoviePlayerController () {
+    AVURLAsset *_asset;
+}
 - (void)loadContentForURL:(NSURL*)fileURL;
 
 @property (strong, readwrite) NSView *view;
@@ -40,7 +42,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         _scalingMode = JKSMoviePlayerScalingResizeAspect;
         _playable = NO;
 
-        _view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 640, 480)];
+        _view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 800, 450)];
         [_view setPostsBoundsChangedNotifications:YES];
         [_view setPostsFrameChangedNotifications:YES];
         
@@ -155,6 +157,12 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 
 - (void) viewDidResize:(NSNotification*)notification {
     [self layoutInterface];
+}
+
+- (void) setSmallControllerView {
+    NSRect f = [_view frame];
+    NSRect c = [_controllerView frame];
+    [_controllerView setFrame:NSMakeRect(20, 20, (NSWidth(f)/2)-40, NSHeight(c))];
 }
 
 - (void) layoutInterface {
@@ -274,6 +282,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 
 - (void)fadeOutControllerView
 {
+    if (self.neverFadeOut)return;
     [[_controllerView animator] setAlphaValue:0];
 }
 
@@ -367,7 +376,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 	[_spinner stopAnimation:self];
 	[_spinner setHidden:YES];
 	if (error) {
-        NSLog(@"%@: %@", NSStringFromSelector(_cmd), error);
+//        NSLog(@"%@: %@", NSStringFromSelector(_cmd), error);
         // TODO: Notify delegate
 	}
 }
@@ -390,19 +399,24 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
     }
 }
 
+- (void)cancel {
+    if (_asset)[_asset cancelLoading];
+}
+
 - (void)loadContentForURL:(NSURL*)fileURL
 {
     
     // Create an asset with our URL, asychronously load its tracks, its duration, and whether it's playable or protected.
     // When that loading is complete, configure a player to play the asset.
     _contentURL = [fileURL copy];
-    AVURLAsset *asset = [AVAsset assetWithURL:_contentURL];
+    _asset = [AVAsset assetWithURL:_contentURL];
     NSArray *assetKeysToLoadAndTest = @[@"playable", @"hasProtectedContent", @"tracks", @"duration"];
-    [asset loadValuesAsynchronouslyForKeys:assetKeysToLoadAndTest completionHandler:^(void) {
+    [_asset loadValuesAsynchronouslyForKeys:assetKeysToLoadAndTest completionHandler:^(void) {
         // The asset invokes its completion handler on an arbitrary queue when loading is complete.
         // Because we want to access our AVPlayer in our ensuing set-up, we must dispatch our handler to the main queue.
         dispatch_async(dispatch_get_main_queue(), ^(void) {
-            [self setUpPlaybackOfAsset:asset withKeys:assetKeysToLoadAndTest];
+            [self setUpPlaybackOfAsset:_asset withKeys:assetKeysToLoadAndTest];
+            _asset = nil;
         });
         
     }];
