@@ -31,6 +31,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 @implementation JKSMoviePlayerController
 {
     NSProgressIndicator *_spinner;
+    NSTimer *_downloadStateTimer;
 }
 
 - (instancetype)initWithContentURL:(NSURL *)fileURL
@@ -40,33 +41,26 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         _playable = NO;
 
         _view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 640, 480)];
+        [_view setPostsBoundsChangedNotifications:YES];
+        [_view setPostsFrameChangedNotifications:YES];
+        
+        [[NSNotificationCenter defaultCenter]
+         addObserver:self selector:@selector(viewDidResize:)
+         name:NSViewBoundsDidChangeNotification
+         object:_view];
+        
+        [[NSNotificationCenter defaultCenter]
+         addObserver:self selector:@selector(viewDidResize:)
+         name:NSViewFrameDidChangeNotification
+         object:_view];
+        
         [_view setWantsLayer:YES];
-        [_view setTranslatesAutoresizingMaskIntoConstraints:YES];
         _spinner = [[NSProgressIndicator alloc] initWithFrame:NSZeroRect];
-        [_spinner setTranslatesAutoresizingMaskIntoConstraints:NO];
         [_spinner setStyle:NSProgressIndicatorSpinningStyle];
         [_spinner startAnimation:self];
         [_view addSubview:_spinner];
-        [self constrainItem:_spinner toCenterOfItem:_view];
 
-        _unplayableLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 150, 25)];
-        [_unplayableLabel setTranslatesAutoresizingMaskIntoConstraints:NO];
-        [_unplayableLabel setTextColor:[NSColor whiteColor]];
-        [_unplayableLabel setBackgroundColor:[NSColor blackColor]];
-        [_unplayableLabel setStringValue:@"Preview unavailable"];
-        [_unplayableLabel setAlignment:NSCenterTextAlignment];
-        [_unplayableLabel setBordered:NO];
-        [_view addSubview:_unplayableLabel];
-        [_view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"[_unplayableLabel(==150)]"
-                                                                      options:0
-                                                                      metrics:nil
-                                                                        views:NSDictionaryOfVariableBindings(_unplayableLabel)]];
-        [self constrainItem:_unplayableLabel toCenterOfItem:_view];
-        [_unplayableLabel setHidden:YES];
-
-        CGColorRef color = [[NSColor blackColor] IN_CGColorCreate];
-        [_view layer].backgroundColor = color;
-        CGColorRelease(color);
+        [_view layer].backgroundColor = [[NSColor blackColor] CGColor];
         NSTrackingArea *tracker = [[NSTrackingArea alloc] initWithRect:[_view bounds]
                                                                options:(NSTrackingActiveInKeyWindow |
                                                                         NSTrackingMouseEnteredAndExited |
@@ -92,22 +86,7 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         _controllerView = [[JKSMoviePlayerControllerView alloc] initWithFrame:NSMakeRect(0, 0, 440, 40)];
         [_view addSubview:_controllerView];
         [_controllerView setAlphaValue:0];
-        [_view addConstraint:[NSLayoutConstraint constraintWithItem:_controllerView
-                                                          attribute:NSLayoutAttributeCenterX
-                                                          relatedBy:NSLayoutRelationEqual
-                                                             toItem:_view
-                                                          attribute:NSLayoutAttributeCenterX
-                                                         multiplier:1.0
-                                                           constant:0]];
-        [_view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-(>=20)-[_controllerView(==440)]-(>=29)-|"
-                                                                      options:0
-                                                                      metrics:nil
-                                                                        views:NSDictionaryOfVariableBindings(_controllerView)]];
-        [_view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-(>=40)-[_controllerView(==40)]-40-|"
-                                                                      options:0
-                                                                      metrics:nil
-                                                                        views:NSDictionaryOfVariableBindings(_controllerView)]];
-
+        
         [_controllerView.playPauseButton setTarget:self];
         [_controllerView.playPauseButton setAction:@selector(playPauseToggle:)];
         [_controllerView.playPauseButton setEnabled:NO];
@@ -115,10 +94,11 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         [_controllerView.timeSlider setTarget:self];
         [_controllerView.timeSlider setAction:@selector(scrubberChanged:)];
         [_controllerView.timeSlider setEnabled:NO];
+        
+        [self layoutInterface];
     }
     return self;
 }
-
 
 - (void)dealloc
 {
@@ -173,6 +153,19 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 	}
 }
 
+- (void) viewDidResize:(NSNotification*)notification {
+    [self layoutInterface];
+}
+
+- (void) layoutInterface {
+    NSRect f = [_view frame];
+    NSRect s = [_spinner frame];
+    [_spinner setFrame:NSMakeRect(NSWidth(f)/2 - NSWidth(s)/2, NSHeight(f)/2 - NSHeight(s)/2,
+                                  NSWidth(s), NSHeight(s))];
+    
+    NSRect c = [_controllerView frame];
+    [_controllerView setFrame:NSMakeRect(20, 20, NSWidth(f)-40, NSHeight(c))];
+}
 
 - (Float64)duration
 {
@@ -303,7 +296,6 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
 		// We can't play this asset. Show the "Unplayable Asset" label.
 		[self stopLoadingAnimationAndHandleError:nil];
         self.playable = NO;
-        [_unplayableLabel setHidden:NO];
         NSLog(@"can't play this. playable=%d protected=%d", [asset isPlayable], [asset hasProtectedContent]);
 		return;
 	}
@@ -414,24 +406,48 @@ static void *JKSMoviePlayerPlayerLayerReadyForDisplay = &JKSMoviePlayerPlayerLay
         });
         
     }];
+    
+    // start measuring the download state
+    if (_downloadStateTimer) {
+        [_downloadStateTimer invalidate];
+        _downloadStateTimer = nil;
+    }
+    _downloadStateTimer = [NSTimer scheduledTimerWithTimeInterval:0.1
+                                                           target:self
+                                                         selector:@selector(updateDownloadDuration)
+                                                         userInfo:nil
+                                                          repeats:YES];
 }
 
-- (void)constrainItem:(id)item toCenterOfItem:(id)containerItem
-{
-    [containerItem addConstraint:[NSLayoutConstraint constraintWithItem:item
-                                                              attribute:NSLayoutAttributeCenterX
-                                                              relatedBy:NSLayoutRelationEqual
-                                                                 toItem:containerItem
-                                                              attribute:NSLayoutAttributeCenterX
-                                                             multiplier:1.0
-                                                               constant:0]];
-    [containerItem addConstraint:[NSLayoutConstraint constraintWithItem:item
-                                                              attribute:NSLayoutAttributeCenterY
-                                                              relatedBy:NSLayoutRelationEqual
-                                                                 toItem:containerItem
-                                                              attribute:NSLayoutAttributeCenterY
-                                                             multiplier:1.0
-                                                               constant:0]];
+- (void) updateDownloadDuration {
+    NSTimeInterval currentDuration = [self availableDuration];
+    NSTimeInterval totalDuration = CMTimeGetSeconds(self.player.currentItem.asset.duration);
+    
+    
+    if (isnan(currentDuration) || isnan(totalDuration)) {
+        [self.controllerView setDownloadPercentage:0];
+        return;
+    }
+
+    if (currentDuration >= totalDuration) {
+        [_downloadStateTimer invalidate];
+        _downloadStateTimer = nil;
+    }
+    
+    // update the display
+    [self.controllerView setDownloadPercentage:currentDuration/totalDuration];
 }
+
+// http://stackoverflow.com/questions/7691854/avplayer-streaming-progress
+- (NSTimeInterval) availableDuration;
+{
+    NSArray *loadedTimeRanges = [[self.player currentItem] loadedTimeRanges];
+    CMTimeRange timeRange = [[loadedTimeRanges objectAtIndex:0] CMTimeRangeValue];
+    Float64 startSeconds = CMTimeGetSeconds(timeRange.start);
+    Float64 durationSeconds = CMTimeGetSeconds(timeRange.duration);
+    NSTimeInterval result = startSeconds + durationSeconds;
+    return result;
+}
+
 
 @end
