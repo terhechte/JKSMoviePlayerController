@@ -8,6 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
+#import <AppKit/AppKit.h>
 
 typedef NS_ENUM(NSUInteger, JKSMoviePlayerScalingMode) {
     JKSMoviePlayerScalingResizeAspect,     // Preserve aspect ratio; fit within layer bounds.
@@ -23,9 +24,12 @@ typedef NS_ENUM(NSUInteger, JKSMoviePlayerScalingMode) {
 @property (nonatomic, readonly) Float64 duration;
 @property (nonatomic, assign) Float64 currentTime;
 @property (assign, readonly, getter=isPlayable) BOOL playable;
+@property (assign) bool neverFadeOut;
 
 - (instancetype)initWithContentURL:(NSURL *)fileURL;
 
+- (void) setSmallControllerView;
 - (void)play;
 - (void)pause;
+- (void)cancel;
 @end
